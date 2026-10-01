@@ -1,15 +1,37 @@
 <?php
 
-$host = "mysql";
-$user = "phpuser";
-$password = "phppass";
-$database = "php-app";
+/*
+|--------------------------------------------------------------------------
+| Database Configuration
+|--------------------------------------------------------------------------
+| Railway:
+|   ใช้ตัวแปร MYSQLHOST / MYSQLUSER / MYSQLPASSWORD / MYSQLDATABASE / MYSQLPORT
+|
+| Local Docker Compose:
+|   ถ้าไม่มีตัวแปรด้านบน จะใช้ mysql / phpuser / phppass / php-app / 3306
+|--------------------------------------------------------------------------
+*/
 
-$conn = new mysqli($host, $user, $password, $database);
+$host = getenv("MYSQLHOST") ?: "mysql";
+$user = getenv("MYSQLUSER") ?: "phpuser";
+$password = getenv("MYSQLPASSWORD") ?: "phppass";
+$database = getenv("MYSQLDATABASE") ?: "php-app";
+$port = (int)(getenv("MYSQLPORT") ?: 3306);
+
+$conn = new mysqli(
+    $host,
+    $user,
+    $password,
+    $database,
+    $port
+);
 
 if ($conn->connect_error) {
     die("Database connection failed: " . $conn->connect_error);
 }
+
+$conn->set_charset("utf8mb4");
+
 
 /*
 |--------------------------------------------------------------------------
@@ -27,165 +49,232 @@ if (stripos($serverSoftware, "Apache") !== false) {
     $serverName = "Unknown";
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| บันทึกข้อมูล
+|--------------------------------------------------------------------------
+*/
+
 $message = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $name = $_POST["name"] ?? "";
-    $email = $_POST["email"] ?? "";
-    $mobile = $_POST["mobile"] ?? "";
+    $name = trim($_POST["name"] ?? "");
+    $email = trim($_POST["email"] ?? "");
+    $mobile = trim($_POST["mobile"] ?? "");
 
-    $stmt = $conn->prepare(
-        "INSERT INTO users (name, email, mobile) VALUES (?, ?, ?)"
-    );
+    if ($name === "" || $email === "" || $mobile === "") {
 
-    $stmt->bind_param("sss", $name, $email, $mobile);
+        $message = "กรุณากรอกข้อมูลให้ครบ";
 
-    if ($stmt->execute()) {
-        $message = "บันทึกข้อมูลเรียบร้อยแล้ว";
     } else {
-        $message = "เกิดข้อผิดพลาด: " . $stmt->error;
-    }
 
-    $stmt->close();
+        $stmt = $conn->prepare(
+            "INSERT INTO users (name, email, mobile) VALUES (?, ?, ?)"
+        );
+
+        if (!$stmt) {
+
+            $message = "เกิดข้อผิดพลาด: " . $conn->error;
+
+        } else {
+
+            $stmt->bind_param(
+                "sss",
+                $name,
+                $email,
+                $mobile
+            );
+
+            if ($stmt->execute()) {
+
+                $message = "บันทึกข้อมูลเรียบร้อยแล้ว";
+
+            } else {
+
+                $message = "เกิดข้อผิดพลาด: " . $stmt->error;
+
+            }
+
+            $stmt->close();
+        }
+    }
 }
 
-$result = $conn->query("SELECT * FROM users ORDER BY id DESC");
+
+/*
+|--------------------------------------------------------------------------
+| ดึงข้อมูลผู้ใช้
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query(
+    "SELECT id, name, email, mobile FROM users ORDER BY id DESC"
+);
 
 ?>
 
 <!DOCTYPE html>
+
 <html lang="th">
 
 <head>
 
-    <meta charset="UTF-8">
+```
+<meta charset="UTF-8">
 
-    <title>Contact Management</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
+<title>Contact Management</title>
 
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 20px;
-        }
+<style>
 
-        h1 {
-            margin-bottom: 10px;
-        }
+    body {
+        font-family: Arial, sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 20px;
+    }
 
-        .server {
-            margin-bottom: 30px;
-            padding: 10px 15px;
-            background: #f5f5f5;
-            border-left: 4px solid #333;
-        }
+    h1 {
+        margin-bottom: 10px;
+    }
 
-        form {
-            border: 1px solid #ddd;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
+    .server {
+        margin-bottom: 30px;
+        padding: 10px 15px;
+        background: #f5f5f5;
+        border-left: 4px solid #333;
+    }
 
-        input {
-            display: block;
-            width: 100%;
-            box-sizing: border-box;
-            padding: 10px;
-            margin: 8px 0 15px;
-        }
+    form {
+        border: 1px solid #ddd;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 30px;
+    }
 
-        button {
-            padding: 10px 20px;
-            cursor: pointer;
-        }
+    input {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        margin: 8px 0 15px;
+    }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+    button {
+        padding: 10px 20px;
+        cursor: pointer;
+    }
 
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 10px;
-        }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
 
-        th {
-            background: #f5f5f5;
-        }
+    th,
+    td {
+        border: 1px solid #ddd;
+        padding: 10px;
+    }
 
-        .message {
-            padding: 10px;
-            background: #eee;
-            margin-bottom: 20px;
-        }
+    th {
+        background: #f5f5f5;
+    }
 
-    </style>
+    .message {
+        padding: 10px;
+        background: #eee;
+        margin-bottom: 20px;
+    }
+
+</style>
+```
 
 </head>
 
 <body>
 
-    <h1>Contact Management</h1>
+```
+<h1>Contact Management</h1>
 
-    <div class="server">
-        Server: <strong><?= htmlspecialchars($serverName) ?></strong>
+<div class="server">
+
+    Server:
+    <strong>
+        <?= htmlspecialchars($serverName) ?>
+    </strong>
+
+</div>
+
+
+<?php if ($message): ?>
+
+    <div class="message">
+
+        <?= htmlspecialchars($message) ?>
+
     </div>
 
-    <?php if ($message): ?>
+<?php endif; ?>
 
-        <div class="message">
-            <?= htmlspecialchars($message) ?>
-        </div>
 
-    <?php endif; ?>
+<form method="POST">
 
-    <form method="POST">
+    <label>ชื่อ</label>
 
-        <label>ชื่อ</label>
+    <input
+        type="text"
+        name="name"
+        required
+    >
 
-        <input
-            type="text"
-            name="name"
-            required
-        >
 
-        <label>Email</label>
+    <label>Email</label>
 
-        <input
-            type="email"
-            name="email"
-            required
-        >
+    <input
+        type="email"
+        name="email"
+        required
+    >
 
-        <label>เบอร์โทร</label>
 
-        <input
-            type="text"
-            name="mobile"
-            required
-        >
+    <label>เบอร์โทร</label>
 
-        <button type="submit">
-            บันทึกข้อมูล
-        </button>
+    <input
+        type="text"
+        name="mobile"
+        required
+    >
 
-    </form>
 
-    <h2>ข้อมูลผู้ใช้</h2>
+    <button type="submit">
+        บันทึกข้อมูล
+    </button>
 
-    <table>
+</form>
 
-        <tr>
-            <th>ID</th>
-            <th>ชื่อ</th>
-            <th>Email</th>
-            <th>เบอร์โทร</th>
-        </tr>
+
+<h2>ข้อมูลผู้ใช้</h2>
+
+
+<table>
+
+    <tr>
+
+        <th>ID</th>
+
+        <th>ชื่อ</th>
+
+        <th>Email</th>
+
+        <th>เบอร์โทร</th>
+
+    </tr>
+
+
+    <?php if ($result): ?>
 
         <?php while ($row = $result->fetch_assoc()): ?>
 
@@ -211,7 +300,10 @@ $result = $conn->query("SELECT * FROM users ORDER BY id DESC");
 
         <?php endwhile; ?>
 
-    </table>
+    <?php endif; ?>
+
+</table>
+```
 
 </body>
 
