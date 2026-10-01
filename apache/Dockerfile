@@ -8,6 +8,8 @@ RUN apt-get update \
 
 WORKDIR /var/www/html
 
+COPY src/ /var/www/html/
+
 CMD ["bash", "-c", "a2dismod mpm_event mpm_worker 2>/dev/null || true; a2enmod mpm_prefork; exec apache2-foreground"]
 
 EXPOSE 80
