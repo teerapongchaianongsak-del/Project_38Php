@@ -1,0 +1,74 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: php_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: php-app
+      MYSQL_USER: phpuser
+      MYSQL_PASSWORD: phppass
+    ports:
+      - "9001:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  php-apache:
+    build: ./apache
+    container_name: php_apache
+    restart: unless-stopped
+    ports:
+      - "81:80"
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      - mysql
+
+  php-nginx:
+    build: ./php
+    container_name: php_nginx_php
+    restart: unless-stopped
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      - mysql
+
+  nginx:
+    image: nginx:latest
+    container_name: php_nginx
+    restart: unless-stopped
+    ports:
+      - "82:80"
+    volumes:
+      - ./src:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php-nginx
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8083:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    depends_on:
+      - mysql
+
+  phpmyadmin2:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin2
+    restart: unless-stopped
+    ports:
+      - "8084:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    depends_on:
+      - mysql
+
+volumes:
+  mysql_data:
