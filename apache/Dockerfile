@@ -8,6 +8,6 @@ RUN apt-get update \
 
 WORKDIR /var/www/html
 
-COPY apache.conf /etc/apache2/sites-available/000-default.conf
+COPY apache/apache.conf /etc/apache2/sites-available/000-default.conf
 
 EXPOSE 80
