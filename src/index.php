@@ -168,7 +168,7 @@ try {
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Contact Management</title>
+<title><?= htmlspecialchars($serverName) ?> Web Server</title>
 
 <style>
 
@@ -236,7 +236,7 @@ try {
 
 <body>
 
-<h1>Contact Management</h1>
+<h1><?= htmlspecialchars($serverName) ?> Web Server</h1>
 
 <div class="server">
 
