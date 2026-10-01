@@ -21,6 +21,35 @@ $database = getenv("PGDATABASE") ?: "postgres";
 
 /*
 |--------------------------------------------------------------------------
+| ตรวจสอบ Web Server และเลือกตารางที่ใช้เก็บข้อมูล
+|--------------------------------------------------------------------------
+| Apache -> ตาราง users
+| Nginx  -> ตาราง users_nginx
+|--------------------------------------------------------------------------
+*/
+
+$serverSoftware = $_SERVER["SERVER_SOFTWARE"] ?? "";
+
+if (stripos($serverSoftware, "Apache") !== false) {
+
+    $serverName = "Apache";
+    $table = "users";
+
+} elseif (stripos($serverSoftware, "nginx") !== false) {
+
+    $serverName = "Nginx";
+    $table = "users_nginx";
+
+} else {
+
+    $serverName = "Unknown";
+    $table = "users";
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | Connect PostgreSQL
 |--------------------------------------------------------------------------
 */
@@ -52,7 +81,7 @@ try {
 |--------------------------------------------------------------------------
 */
 
-$dbStatus = "Connected to PostgreSQL Server successfully! (Host: {$host}, Port: {$port})";
+$dbStatus = "Connected to PostgreSQL Server successfully! (Host: {$host}, Port: {$port}, Table: {$table})";
 
 
 /*
@@ -62,36 +91,13 @@ $dbStatus = "Connected to PostgreSQL Server successfully! (Host: {$host}, Port: 
 */
 
 $conn->exec(
-    "CREATE TABLE IF NOT EXISTS users (
+    "CREATE TABLE IF NOT EXISTS {$table} (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
         mobile VARCHAR(50) NOT NULL
     )"
 );
-
-
-/*
-|--------------------------------------------------------------------------
-| ตรวจสอบ Web Server
-|--------------------------------------------------------------------------
-*/
-
-$serverSoftware = $_SERVER["SERVER_SOFTWARE"] ?? "";
-
-if (stripos($serverSoftware, "Apache") !== false) {
-
-    $serverName = "Apache";
-
-} elseif (stripos($serverSoftware, "nginx") !== false) {
-
-    $serverName = "Nginx";
-
-} else {
-
-    $serverName = "Unknown";
-
-}
 
 
 /*
@@ -118,7 +124,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         try {
 
             $stmt = $conn->prepare(
-                "INSERT INTO users (name, email, mobile)
+                "INSERT INTO {$table} (name, email, mobile)
                  VALUES (:name, :email, :mobile)"
             );
 
@@ -151,7 +157,7 @@ try {
 
     $stmt = $conn->query(
         "SELECT id, name, email, mobile
-         FROM users
+         FROM {$table}
          ORDER BY id DESC"
     );
 
