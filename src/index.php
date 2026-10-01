@@ -2,35 +2,48 @@
 
 /*
 |--------------------------------------------------------------------------
-| Database Configuration
+| PostgreSQL Configuration
 |--------------------------------------------------------------------------
-| Railway:
-|   ใช้ตัวแปร MYSQLHOST / MYSQLUSER / MYSQLPASSWORD / MYSQLDATABASE / MYSQLPORT
+| Railway PostgreSQL:
+| ใช้ตัวแปร PGHOST / PGPORT / PGUSER / PGPASSWORD / PGDATABASE
 |
-| Local Docker Compose:
-|   ถ้าไม่มีตัวแปรด้านบน จะใช้ mysql / phpuser / phppass / php-app / 3306
+| Local:
+| ถ้าไม่มีตัวแปร Railway จะใช้ค่าด้านล่าง
 |--------------------------------------------------------------------------
 */
 
-$host = getenv("MYSQLHOST") ?: "mysql";
-$user = getenv("MYSQLUSER") ?: "phpuser";
-$password = getenv("MYSQLPASSWORD") ?: "phppass";
-$database = getenv("MYSQLDATABASE") ?: "php-app";
-$port = (int)(getenv("MYSQLPORT") ?: 3306);
+$host = getenv("PGHOST") ?: "localhost";
+$port = getenv("PGPORT") ?: "5432";
+$user = getenv("PGUSER") ?: "postgres";
+$password = getenv("PGPASSWORD") ?: "";
+$database = getenv("PGDATABASE") ?: "postgres";
 
-$conn = new mysqli(
-    $host,
-    $user,
-    $password,
-    $database,
-    $port
-);
 
-if ($conn->connect_error) {
-    die("Database connection failed: " . $conn->connect_error);
+/*
+|--------------------------------------------------------------------------
+| Connect PostgreSQL
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $dsn = "pgsql:host={$host};port={$port};dbname={$database}";
+
+    $conn = new PDO(
+        $dsn,
+        $user,
+        $password,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]
+    );
+
+} catch (PDOException $e) {
+
+    die("Database connection failed: " . htmlspecialchars($e->getMessage()));
+
 }
-
-$conn->set_charset("utf8mb4");
 
 
 /*
@@ -42,11 +55,17 @@ $conn->set_charset("utf8mb4");
 $serverSoftware = $_SERVER["SERVER_SOFTWARE"] ?? "";
 
 if (stripos($serverSoftware, "Apache") !== false) {
+
     $serverName = "Apache";
+
 } elseif (stripos($serverSoftware, "nginx") !== false) {
+
     $serverName = "Nginx";
+
 } else {
+
     $serverName = "Unknown";
+
 }
 
 
@@ -64,42 +83,36 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $email = trim($_POST["email"] ?? "");
     $mobile = trim($_POST["mobile"] ?? "");
 
+
     if ($name === "" || $email === "" || $mobile === "") {
 
         $message = "กรุณากรอกข้อมูลให้ครบ";
 
     } else {
 
-        $stmt = $conn->prepare(
-            "INSERT INTO users (name, email, mobile) VALUES (?, ?, ?)"
-        );
+        try {
 
-        if (!$stmt) {
-
-            $message = "เกิดข้อผิดพลาด: " . $conn->error;
-
-        } else {
-
-            $stmt->bind_param(
-                "sss",
-                $name,
-                $email,
-                $mobile
+            $stmt = $conn->prepare(
+                "INSERT INTO users (name, email, mobile)
+                 VALUES (:name, :email, :mobile)"
             );
 
-            if ($stmt->execute()) {
+            $stmt->execute([
+                ":name" => $name,
+                ":email" => $email,
+                ":mobile" => $mobile
+            ]);
 
-                $message = "บันทึกข้อมูลเรียบร้อยแล้ว";
+            $message = "บันทึกข้อมูลเรียบร้อยแล้ว";
 
-            } else {
+        } catch (PDOException $e) {
 
-                $message = "เกิดข้อผิดพลาด: " . $stmt->error;
+            $message = "เกิดข้อผิดพลาด: " . $e->getMessage();
 
-            }
-
-            $stmt->close();
         }
+
     }
+
 }
 
 
@@ -109,9 +122,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 |--------------------------------------------------------------------------
 */
 
-$result = $conn->query(
-    "SELECT id, name, email, mobile FROM users ORDER BY id DESC"
-);
+try {
+
+    $stmt = $conn->query(
+        "SELECT id, name, email, mobile
+         FROM users
+         ORDER BY id DESC"
+    );
+
+    $users = $stmt->fetchAll();
+
+} catch (PDOException $e) {
+
+    $users = [];
+
+    $message = "ไม่สามารถอ่านข้อมูลได้: " . $e->getMessage();
+
+}
 
 ?>
 
@@ -274,33 +301,29 @@ $result = $conn->query(
     </tr>
 
 
-    <?php if ($result): ?>
+    <?php foreach ($users as $row): ?>
 
-        <?php while ($row = $result->fetch_assoc()): ?>
+        <tr>
 
-            <tr>
+            <td>
+                <?= htmlspecialchars($row["id"]) ?>
+            </td>
 
-                <td>
-                    <?= htmlspecialchars($row["id"]) ?>
-                </td>
+            <td>
+                <?= htmlspecialchars($row["name"]) ?>
+            </td>
 
-                <td>
-                    <?= htmlspecialchars($row["name"]) ?>
-                </td>
+            <td>
+                <?= htmlspecialchars($row["email"]) ?>
+            </td>
 
-                <td>
-                    <?= htmlspecialchars($row["email"]) ?>
-                </td>
+            <td>
+                <?= htmlspecialchars($row["mobile"]) ?>
+            </td>
 
-                <td>
-                    <?= htmlspecialchars($row["mobile"]) ?>
-                </td>
+        </tr>
 
-            </tr>
-
-        <?php endwhile; ?>
-
-    <?php endif; ?>
+    <?php endforeach; ?>
 
 </table>
 ```
@@ -308,9 +331,3 @@ $result = $conn->query(
 </body>
 
 </html>
-
-<?php
-
-$conn->close();
-
-?>
