@@ -10,7 +10,7 @@ RUN printf '[www]\nclear_env = no\n' > /usr/local/etc/php-fpm.d/zz-env.conf
 
 WORKDIR /var/www/html
 COPY src/ /var/www/html/
-COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY nginx/default.conf /etc/nginx/templates/default.conf.template
 COPY nginx/start.sh /start.sh
 RUN sed -i 's/\r$//' /start.sh && chmod +x /start.sh
 
