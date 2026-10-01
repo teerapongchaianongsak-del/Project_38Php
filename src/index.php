@@ -2,39 +2,21 @@
 
 /*
 |--------------------------------------------------------------------------
-| อ่านค่า Environment (Railway)
+| PostgreSQL Configuration
 |--------------------------------------------------------------------------
-| อ่านจาก getenv() ก่อน ถ้าไม่เจอลอง $_SERVER และ $_ENV
+| Railway PostgreSQL:
+| ใช้ตัวแปร PGHOST / PGPORT / PGUSER / PGPASSWORD / PGDATABASE
+|
+| Local:
+| ถ้าไม่มีตัวแปร Railway จะใช้ค่าด้านล่าง
+|--------------------------------------------------------------------------
 */
 
-function env(string $key, string $default = ""): string
-{
-    $value = getenv($key);
-
-    if ($value === false || $value === "") {
-        $value = $_SERVER[$key] ?? ($_ENV[$key] ?? "");
-    }
-
-    return $value !== "" ? (string) $value : $default;
-}
-
-$host     = env("PGHOST", "localhost");
-$port     = env("PGPORT", "5432");
-$user     = env("PGUSER", "postgres");
-$password = env("PGPASSWORD", "");
-$database = env("PGDATABASE", "postgres");
-
-// ตั้ง APP_DEBUG=0 ใน Railway Variables เมื่อใช้งานจริง เพื่อซ่อนรายละเอียด error
-$debug = env("APP_DEBUG", "1") === "1";
-
-// --- DEBUG ชั่วคราว: แสดงใน Deploy Logs เฉพาะความยาว ไม่แสดงรหัสผ่าน ---
-// ลบ 4 บรรทัดนี้ออกเมื่อแก้ปัญหาเสร็จ
-error_log(
-    "DBG host=" . $host .
-    " port=" . $port .
-    " user_len=" . strlen($user) .
-    " PGPASSWORD len=" . strlen($password)
-);
+$host = getenv("PGHOST") ?: "localhost";
+$port = getenv("PGPORT") ?: "5432";
+$user = getenv("PGUSER") ?: "postgres";
+$password = getenv("PGPASSWORD") ?: "";
+$database = getenv("PGDATABASE") ?: "postgres";
 
 
 /*
@@ -59,15 +41,7 @@ try {
 
 } catch (PDOException $e) {
 
-    error_log("DB connection failed: " . $e->getMessage());
-
-    http_response_code(500);
-
-    if ($debug) {
-        die("Database connection failed: " . htmlspecialchars($e->getMessage()));
-    }
-
-    die("ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่ภายหลัง");
+    die("Database connection failed: " . htmlspecialchars($e->getMessage()));
 
 }
 
@@ -78,22 +52,14 @@ try {
 |--------------------------------------------------------------------------
 */
 
-try {
-
-    $conn->exec(
-        "CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            email VARCHAR(255) NOT NULL,
-            mobile VARCHAR(50) NOT NULL
-        )"
-    );
-
-} catch (PDOException $e) {
-
-    error_log("Create table failed: " . $e->getMessage());
-
-}
+$conn->exec(
+    "CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        mobile VARCHAR(50) NOT NULL
+    )"
+);
 
 
 /*
@@ -129,8 +95,8 @@ $message = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $name   = trim($_POST["name"] ?? "");
-    $email  = trim($_POST["email"] ?? "");
+    $name = trim($_POST["name"] ?? "");
+    $email = trim($_POST["email"] ?? "");
     $mobile = trim($_POST["mobile"] ?? "");
 
 
@@ -148,8 +114,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             );
 
             $stmt->execute([
-                ":name"   => $name,
-                ":email"  => $email,
+                ":name" => $name,
+                ":email" => $email,
                 ":mobile" => $mobile
             ]);
 
@@ -157,11 +123,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
-            error_log("Insert failed: " . $e->getMessage());
-
-            $message = $debug
-                ? "เกิดข้อผิดพลาด: " . $e->getMessage()
-                : "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
+            $message = "เกิดข้อผิดพลาด: " . $e->getMessage();
 
         }
 
@@ -188,13 +150,9 @@ try {
 
 } catch (PDOException $e) {
 
-    error_log("Select failed: " . $e->getMessage());
-
     $users = [];
 
-    $message = $debug
-        ? "ไม่สามารถอ่านข้อมูลได้: " . $e->getMessage()
-        : "ไม่สามารถอ่านข้อมูลได้";
+    $message = "ไม่สามารถอ่านข้อมูลได้: " . $e->getMessage();
 
 }
 
@@ -274,7 +232,6 @@ try {
     }
 
 </style>
-
 </head>
 
 <body>
@@ -361,7 +318,7 @@ try {
         <tr>
 
             <td>
-                <?= htmlspecialchars((string) $row["id"]) ?>
+                <?= htmlspecialchars($row["id"]) ?>
             </td>
 
             <td>
@@ -381,7 +338,6 @@ try {
     <?php endforeach; ?>
 
 </table>
-
 </body>
 
 </html>
